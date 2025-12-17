@@ -19,7 +19,7 @@ CONFIG = {
     'date_col': '报告日期',                   # 日期列名
     'rank_col': '搜索频率排名',               # 排名列名
     
-    'similarity_threshold': 0.725,            # 相似度阈值
+    'similarity_threshold': 0.75,            # 相似度阈值
     'device': 'cpu'                          # AMD 780M 强制用 CPU
 }
 
@@ -55,58 +55,88 @@ def module_1_collect_vocab():
     return vocab_list
 
 # ================= 🧠 模块 2: 向量聚类与映射 =================
+# ================= 🧠 模块 2（稳定版）: 向量化 + Top-K 相似词映射 =================
 def module_2_build_mapping(vocab_list):
     """
-    对唯一词进行向量化，生成映射字典。
+    【推荐稳定实现】
+    - 使用 Top-K 搜索替代 range_search
+    - 避免 FAISS 在 Windows / CPU / 百万级下的 C++ abort
+    - 语义效果与 range_search 基本一致
     """
-    print("\n🧠 [模块 2] 启动: 向量化与聚类 (AMD CPU Mode)...")
+    print("\n🧠 [模块 2 - 稳定版] 启动: 向量化 + Top-K 相似搜索 (CPU Safe Mode)")
     start_time = time.time()
-    
-    # 1. 加载模型
-    model = SentenceTransformer('all-MiniLM-L6-v2', device=CONFIG['device'])
-    
-    # 2. 向量化
+
+    # ---------- 1️⃣ 加载模型 ----------
+    model = SentenceTransformer(
+        'all-MiniLM-L6-v2',
+        device=CONFIG['device']
+    )
+
+    # ---------- 2️⃣ 向量化 ----------
     print(f"   ⚡ 正在计算 {len(vocab_list)} 个词的向量...")
-    embeddings = model.encode(vocab_list, batch_size=64, show_progress_bar=True, convert_to_numpy=True)
+    embeddings = model.encode(
+        vocab_list,
+        batch_size=64,
+        show_progress_bar=True,
+        convert_to_numpy=True
+    )
+
+    # 单位化，内积 = cosine
     faiss.normalize_L2(embeddings)
-    
-    # 3. FAISS 聚类
-    print("   🔍 正在搜索相似词...")
+
+    # ---------- 3️⃣ 构建 FAISS Index ----------
     dim = embeddings.shape[1]
     index = faiss.IndexFlatIP(dim)
     index.add(embeddings)
-    
-    # 范围搜索
-    limits, distances, indices = index.range_search(embeddings, CONFIG['similarity_threshold'])
-    
-    # 4. 构建字典
+
+    # ---------- 4️⃣ Top-K 搜索（核心差异点） ----------
+    # ⚠️ 经验值：20～30 足够覆盖所有近义词
+    TOP_K = 20
+    SIM_THRESHOLD = CONFIG['similarity_threshold']
+
+    print(f"   🔍 正在执行 Top-{TOP_K} 相似搜索 (threshold={SIM_THRESHOLD})...")
+    D, I = index.search(embeddings, TOP_K)
+
+    # ---------- 5️⃣ 构建映射 ----------
     mapping_dict = {}
-    change_log = [] # 记录哪些词发生了变化，方便后续导出检查
-    
-    for i in range(len(vocab_list)):
-        start, end = limits[i], limits[i+1]
-        neighbor_indices = indices[start:end]
-        
-        # 获取这一组的所有词
-        neighbors = [vocab_list[idx] for idx in neighbor_indices]
-        
-        # 策略：选最短的词作为标准词 (Canonical Term)
+    change_log = []
+
+    for i, word in enumerate(vocab_list):
+        # 当前词的 Top-K 相似词
+        sim_scores = D[i]
+        neighbor_indices = I[i]
+
+        # 过滤：只保留 ≥ 阈值 的
+        neighbors = [
+            vocab_list[j]
+            for j, score in zip(neighbor_indices, sim_scores)
+            if score >= SIM_THRESHOLD
+        ]
+
+        # 理论上至少包含自身
+        if not neighbors:
+            mapping_dict[word] = word
+            continue
+
+        # Canonical 策略：最短字符串
         canonical = min(neighbors, key=len)
-        
-        current_word = vocab_list[i]
-        mapping_dict[current_word] = canonical
-        
-        # 如果这个词被改变了，记录下来
-        if current_word != canonical:
+        mapping_dict[word] = canonical
+
+        if word != canonical:
             change_log.append({
-                '原始词 (Original)': current_word,
+                '原始词 (Original)': word,
                 '映射后 (Mapped)': canonical,
                 '同组词数': len(neighbors)
             })
-            
-    print(f"   ✅ 映射构建完成! 发生映射的词对数量: {len(change_log)}")
-    print(f"   ⏱️ 耗时: {time.time() - start_time:.2f}s")
-    
+
+        # 可选进度提示（不影响性能）
+        if (i + 1) % 100000 == 0:
+            print(f"      已处理 {i + 1:,}/{len(vocab_list):,} 个词", end='\r')
+
+    print(f"\n   ✅ 映射完成!")
+    print(f"   🔁 发生映射的词数: {len(change_log):,}")
+    print(f"   ⏱️ 总耗时: {time.time() - start_time:.2f}s")
+
     return mapping_dict, change_log
 
 # ================= 📝 模块 3: 输出验证文件 (你需求的核心) =================
@@ -256,7 +286,7 @@ if __name__ == "__main__":
     # 1. 收集词表
     vocab = module_1_collect_vocab()
     
-    # 2. 训练映射
+    # 2. 训练映射 (最核心的一步)
     mapping, changes = module_2_build_mapping(vocab)
     
     # 3. 导出Excel对比文件 & 处理数据

@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
-from recommender import HybridRecommender
+from src.recommender import HybridRecommender
 
 # ================= 配置 =================
 st.set_page_config(page_title="Amazon 智能选品引擎", page_icon="🛍️", layout="wide")
