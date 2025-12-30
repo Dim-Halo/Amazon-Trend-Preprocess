@@ -260,10 +260,10 @@ def module_4_generate_matrix():
     final_df = final_df.sort_index(axis=1)
     
     # 6. 最终清洗与保存
-    final_df.fillna(2000000, inplace=True) # 填充空值
+    final_df.fillna(100000, inplace=True) # 填充空值
     
-    # 过滤逻辑 (保留历史最高排名前 200万 的词)
-    valid_mask = final_df.min(axis=1) < 2000000
+    # 过滤逻辑 (保留历史最高排名前 10万 的词)
+    valid_mask = final_df.min(axis=1) < 100000
     
     final_matrix = np.log10(final_df.loc[valid_mask].values + 1)
     kept_terms = final_df.index[valid_mask]
@@ -284,13 +284,13 @@ def module_4_generate_matrix():
 # ================= 🚀 主程序入口 =================
 if __name__ == "__main__":
     # 1. 收集词表
-    vocab = module_1_collect_vocab()
+    # vocab = module_1_collect_vocab()
     
     # 2. 训练映射 (最核心的一步)
-    mapping, changes = module_2_build_mapping(vocab)
+    # mapping, changes = module_2_build_mapping(vocab)
     
     # 3. 导出Excel对比文件 & 处理数据
-    files = module_3_export_verification(mapping, changes)
+    # files = module_3_export_verification(mapping, changes)
     
     # 4. 生成最终矩阵
     module_4_generate_matrix()

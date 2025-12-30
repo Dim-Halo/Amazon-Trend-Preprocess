@@ -1,46 +1,74 @@
 import pandas as pd
 import numpy as np
-import os
-os.environ['HF_ENDPOINT'] = 'https://hf-mirror.com'
+import sys
+from pathlib import Path
+
+# 添加项目根目录到路径
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from src.config import Config
+from src.utils.logger import setup_logger
 from sentence_transformers import SentenceTransformer
 
-
-# ================= 配置 =================
-CONFIG = {
-    'term_file': './final_npy/terms.csv',      # 你的 Terms 索引文件
-    'output_vector': './final_npy/term_vectors.npy', # 输出的向量文件
-    'model_name': 'all-MiniLM-L6-v2',          # 轻量级语义模型
-    'device': 'cpu'                            # AMD 780M 用 CPU 即可
-}
+# 设置环境
+Config.setup_environment()
+Config.ensure_folders()
+logger = setup_logger('generate_vectors', Config.LOG_FOLDER / 'generate_vectors.log')
 
 def generate_vectors():
-    print(f"🚀 加载词表: {CONFIG['term_file']}")
-    if not os.path.exists(CONFIG['term_file']):
-        print("❌ 错误：找不到 terms.csv，请先运行 pipeline 生成最终矩阵。")
-        return
+    """生成词向量文件"""
+    logger.info("=" * 50)
+    logger.info("🚀 开始生成词向量...")
 
-    # 读取 terms
-    df = pd.read_csv(CONFIG['term_file'], encoding='utf-8-sig')
+    term_file = Config.NPY_FOLDER / 'terms.csv'
+    output_file = Config.NPY_FOLDER / 'term_vectors.npy'
+
+    # 检查输入文件
+    if not term_file.exists():
+        logger.error(f"找不到 terms.csv: {term_file}")
+        logger.error("请先运行 pipeline 生成最终矩阵")
+        return False
+
+    # 读取词表
+    logger.info(f"加载词表: {term_file}")
+    df = pd.read_csv(term_file, encoding='utf-8-sig')
     terms = df.iloc[:, 0].astype(str).tolist()
-    print(f"   共 {len(terms)} 个词。")
+    logger.info(f"共 {len(terms)} 个词")
 
     # 加载模型
-    print(f"🧠 加载模型 {CONFIG['model_name']}...")
-    model = SentenceTransformer(CONFIG['model_name'], device=CONFIG['device'])
+    logger.info(f"加载模型 {Config.MODEL_NAME}...")
+    model = SentenceTransformer(Config.MODEL_NAME, device=Config.DEVICE)
 
     # 向量化
-    print("⚡ 开始向量化计算 (可能需要几分钟)...")
-    embeddings = model.encode(terms, batch_size=64, show_progress_bar=True, convert_to_numpy=True)
+    logger.info("开始向量化计算（可能需要几分钟）...")
+    embeddings = model.encode(
+        terms,
+        batch_size=Config.BATCH_SIZE,
+        show_progress_bar=True,
+        convert_to_numpy=True
+    )
 
-    # 归一化 (这一步很关键，归一化后 点积(Dot Product) 等于 余弦相似度)
-    # 这样前端计算速度会飞快
+    # 归一化
+    logger.info("归一化向量...")
     norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
     embeddings = embeddings / norms
 
     # 保存
-    print(f"💾 保存向量至: {CONFIG['output_vector']}")
-    np.save(CONFIG['output_vector'], embeddings)
-    print("✅ 完成！现在可以去运行 app.py 了。")
+    logger.info(f"保存向量至: {output_file}")
+    np.save(output_file, embeddings)
+
+    logger.info("✅ 向量生成完成！")
+    logger.info(f"向量形状: {embeddings.shape}")
+    logger.info("现在可以运行 Streamlit 应用了")
+
+    return True
 
 if __name__ == "__main__":
-    generate_vectors()
+    try:
+        success = generate_vectors()
+        sys.exit(0 if success else 1)
+    except Exception as e:
+        logger.error(f"生成向量失败: {e}")
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)

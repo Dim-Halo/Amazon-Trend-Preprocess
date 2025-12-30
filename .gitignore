@@ -1,23 +1,158 @@
-# 忽略 Python 缓存
+# Python
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
 
-# 忽略环境配置
-.env
-.venv/
+# Virtual Environment
 venv/
+.venv/
+env/
+ENV/
+env.bak/
+venv.bak/
 
-# 忽略所有数据文件夹 (防止上传大文件)
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.pydevproject
+.settings/
+*.sublime-project
+*.sublime-workspace
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb
+
+# Data Files (large datasets)
 raw_data/
 clean_data/
 processed_data/
+data/
+!data/README.md
+!data/small_data/
+
+# Output Files
 final_npy/
 mapping_check/
 saves/
+*.npy
+*.parquet
 
-# 忽略 Mac 系统文件
+# Cache and Logs
+cache/
+logs/
+*.log
+.cache/
+
+# Database Files
+*.db
+*.sqlite
+*.sqlite3
+*.duckdb
+*.duckdb.wal
+
+# Temporary Files
+*.tmp
+*.bak
+*.swp
+*~
 .DS_Store
+Thumbs.db
+desktop.ini
 
-# 忽略 IDE 配置
-.vscode/
-.idea/
+# Excel and CSV (large files)
+*.xlsx
+*.xls
+!*_sample.xlsx
+!*_template.xlsx
+
+# Model Files (if large)
+*.bin
+*.pt
+*.pth
+*.h5
+*.pkl
+*.pickle
+
+# Environment Variables
+.env
+.env.local
+.env.*.local
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Coverage reports
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+.pytest_cache/
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# pytype static type analyzer
+.pytype/
+
+# Streamlit
+.streamlit/secrets.toml
+
+# Git
+*.orig
+*.rej
+
+# Compressed files
+*.zip
+*.tar.gz
+*.rar
+*.7z
+
+# Documentation build
+docs/_build/
+site/
+
+# Project specific
+# Keep small sample data for testing
+!data/small_data/*.csv
+
+.claude/
